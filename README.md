@@ -29,3 +29,5 @@ Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis 과정입니다.
 * 일자별 SESSION, SIPCNT, SESS/SIPCNT를 시각화하였고 노이즈 제거가 필요한 것으로 확인했습니다.
 
 ![image](https://user-images.githubusercontent.com/47383452/141672840-f86d0f38-ac9a-4db7-b752-2ab8238d5ca0.png)
+
+#
