@@ -105,14 +105,111 @@ Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis 과정입니다.
    * IP0040922
    ![image](https://user-images.githubusercontent.com/47383452/142263473-11b65b5c-75b1-4a99-83c0-4fab9f6df664.png)
    
-   #### 특정 시간대에 집중적으로 트래픽이 발생하는 IP를 발견할 수 있었습니다. Revisit 비율이 높고 패킷레벨에서 많은 자원을 소비한 것을 확인하였습니다.
+   #### DDoS 공격 / 특정 시간대에 집중적으로 트래픽이 발생하는 IP를 발견할 수 있었습니다. Revisit 비율이 높고 패킷레벨에서 많은 자원을 소비한 것을 확인하였습니다.
 
 ### 2. Response Code Based Analysis
 
 ##### 응답코드 400~ 추출
 
+```
+zcat srv1_accesslog.gz | awk '$7~/^[12345]/{print $1 "\t" $7}'|sort | uniq -c | awk '{print $2 "\t" $3 "\t" $1}' | 
+awk '{if ($2 >= "400" && $2 < 500) print ($0)} > 400_rcode.tsv
+```
+```
+cat 400_rcode.tsv | sort -rnk 3 | head | awk '{print $3}'|head
+13851
+13574
+5228
+3583
+3166
+3109
+2976
+2760
+2698
+2665
+```
+* 응답코드 4XX인 레코드 시각화
+ ```
+ cat 400_r_code.tsv | sort -rnk 3 | awk ‘{print $3}’ | feedgnuplot –histogram 0 –ymax 5
+ ```
+![image](https://user-images.githubusercontent.com/47383452/142265566-814b9174-acda-48f3-882b-74e1ec627a38.png)
+```
+cat 400_rcode.tsv | sort -rnk 3 | awk '{print $1 "\t" $3}' | feedgnuplot --domain --timefmt '%Y-%m-%d' --points
+```
+![image](https://user-images.githubusercontent.com/47383452/142265627-e720ffc2-ca86-4874-acda-871dfa11d92e.png)
 
+* 응답코드 4XX인 SIP
+```
+zcat srv1_accesslog.gz | awk '$7~/^[12345]/{print $3 "\t" $7}'|sort | uniq -c | awk '{print $2 "\t" $3 "\t" $1}' | awk '{if ($2 >=400 && $2 < 500) print $0}' > sip_rcode.tsv
+```
+![image](https://user-images.githubusercontent.com/47383452/142265796-82e872a3-abcf-42e9-9958-cd9834112a23.png)
 
+```
+cat sip_rcode.tsv | sort -rnk 3 | head
+IP1093735	404	17010
+IP0053005	404	11867
+IP0008180	404	11730
+IP0013767	404	11297
+IP0099074	404	10495
+IP0002194	404	10088
+IP1056836	404	10049
+IP1086971	404	9032
+IP1087023	404	7962
+IP1056822	404	6520
+```
 
+* 4XX가 상위 100개인 IP 통신 추출
+```
+cat sip_rcode.tsv | sort -rnk 3 | head -100 > top_sip.ip
+```
+```
+for ip in $(cat top_sip.ip)
+> do
+> zcat srv1_accesslog.gz | awk '$3==sip{print $0}' sip=$ip > $ip".log"
+> done
+```
+![image](https://user-images.githubusercontent.com/47383452/142265986-cdba40db-b08b-4920-a443-3adc10a6f699.png)
+```
+cat IP* | awk '$7!=""{print $1 "\t" $7}' | awk '{if (($2 >= 200 && $2 < 300) || ($2 >= 400 && $2 < 500)) print $0}' > 2XX_4XX.log
+cat 2XX_4XX.log |awk '{print $1 "\t" (int($2/200)-int($2/400)) "\t" int($2/400)}' | awk '$1==prv{r2+=$2;r4+=$3;next}{print prv "\t" r2 "\t" r4; prv=$1;r2=$2; r4=$3}' |
+feedgnuplot --domain --points  --timefmt "%Y-%m-%d" --title "2xx AND 4xx Response Frequency" --legend 0 "2XX" --legend 1 "4XX"
+```
+![image](https://user-images.githubusercontent.com/47383452/142266167-57ee1443-425b-4df1-9526-67ca7c9b3049.png)
 
+```
+cat IP* | awk '$7!=""{print $1 "\t" $3 "\t" $7}' |sort| awk '{print $1 "_" $2 "_" int($3/100)*100}' | uniq -c | sort -rn | head -20
+```
+![image](https://user-images.githubusercontent.com/47383452/142266234-73b5651e-0a3c-4955-adfd-db186669e42c.png)
 
+##### IP0008180과 IP0053005의 400번대 응답코드가 타 IP대비 높은 것을 확인 할 수 있다. 
+
+* IP0053005
+```
+cat IP0053005.log | awk '$7!=""{print $1 "\t" $7}' | sort | awk '{print $1 "\t" int(($2)/100)*100}' |
+awk '{print $1 "\t" int($2/200)-int($2/400) "\t" int($2/300) "\t" int($2/400) "\t" int($2/500)}'|
+awk '$1==prv{r2+=$2;r3+=$3;r4+=$4;r5+=$5;next}{print prv "\t" r2 "\t" r3 "\t" r4 "\t" r5; prv=$1;r2=$2;r3=$3; r4=$4;r5=$5}'
+```
+
+```
+		 	200	300 400	500
+2017-07-04	58	3	3	0
+2017-08-01	13664	11944	11837	4
+2017-09-21	63	4	4	0
+2017-10-10	44	2	2	0
+2017-10-11	318	21	20	1
+2017-10-13	3	2	2	0
+2017-10-20	36	8	3	0
+2018-01-03	80	2	1	0
+```
+* IP0008180
+```
+cat IP0008180.log | awk '$7!=""{print $1 "\t" $7}' | sort | awk '{print $1 "\t" int(($2)/100)*100}' |
+awk '{print $1 "\t" int($2/200)-int($2/400) "\t" int($2/300) "\t" int($2/400) "\t" int($2/500)}'|
+awk '$1==prv{r2+=$2;r3+=$3;r4+=$4;r5+=$5;next}{print prv "\t" r2 "\t" r3 "\t" r4 "\t" r5; prv=$1;r2=$2;r3=$3; r4=$4;r5=$5}'
+```
+```
+			200	300	400	500	
+2017-03-13	270	74	28	0
+2017-03-14	12688	11837	11680	6
+```
+##### IP0053005은 2017-08-01에,  IP0008180은 2017-03-14에 공격을 수행했다고 볼 수 있습니다.
