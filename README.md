@@ -1,6 +1,5 @@
 # WebLog-Based-Anormaly-Detection Using Linux CLI
 웹로그 기반 정보유출징후 탐지
-[KISA 웹로그 분석 고급과정]
 Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis 과정입니다.
 
 ### 데이터 살펴보기
