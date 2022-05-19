@@ -1,6 +1,6 @@
 # WebLog-Based-Anormaly-Detection Using Linux CLI
 웹로그 기반 정보유출징후 탐지
-Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis 과정입니다.
+Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis
 
 ### 데이터 살펴보기
 * 정보유출 징후가 식별되는 데이터로, 전처리로 Datetime / SIP / Method / Payload / Version / ResponseCode / ResponseByte로 칼럼 추출하였습니다.
