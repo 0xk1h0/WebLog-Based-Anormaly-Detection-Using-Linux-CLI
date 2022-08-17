@@ -1,40 +1,39 @@
 # WebLog-Based-Anormaly-Detection Using Linux CLI
-웹로그 기반 정보유출징후 탐지
+
 Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis
 
-### 데이터 살펴보기
-* 정보유출 징후가 식별되는 데이터로, 전처리로 Datetime / SIP / Method / Payload / Version / ResponseCode / ResponseByte로 칼럼 추출하였습니다.
-* 칼럼 추출 간 tshark를 활용하였고 CLI에서 전처리를 하다보니 다양한 ServerSet에서 활용하기에 편리하다는 장점이 있습니다.
+### Data
+* Datetime / SIP / Method / Payload / Version / ResponseCode / ResponseByte
+
 ![image](https://user-images.githubusercontent.com/47383452/141668694-5991c6e0-7566-4828-a291-abfcffff3e0b.png)
-* 약 154MB의 전처리된 데이터이며, 6000만 Line의 세선데이터가 포함되어 있습니다.
+* about 154MB, 60 million Line of Session data included
 
 ### 1. Connection based Analysis
-* 일자별로 연결기반 분석을 해보면,
+
 ![image](https://user-images.githubusercontent.com/47383452/141672002-7acd0782-50b1-4da8-b6be-506b44f55c1d.png)
-* 특정 일자에서 상대적으로 많은 Session이 발생한 것을 확인할 수 있습니다.
+
 ` cat srv1_access_daily.tsv | feedgnuplot --domain --timefmt "%Y-%m-%d" --with "boxes lt -1" --legend 0 "daily HTTP Session"`
 
-##### SIP 접속 수
+##### SIP connection
 ![image](https://user-images.githubusercontent.com/47383452/141672273-7fddfc6b-9c45-4e5f-9ef0-437679151439.png)
 
-일자별 IP 반복수(재방문) 확인
 
 ![image](https://user-images.githubusercontent.com/47383452/141672287-d6a13606-2c26-44a2-9ed2-a974a88a8d07.png)
 
 ![image](https://user-images.githubusercontent.com/47383452/141672674-3cb289d2-6fb3-4851-81da-1441f5cfad89.png)
 
 ![image](https://user-images.githubusercontent.com/47383452/141672741-1270a547-21c6-4872-bc84-44a46381944b.png)
-* 일자별 SESSION, SIPCNT, SESS/SIPCNT를 시각화하였고 노이즈 제거가 필요한 것으로 확인했습니다.
+* Daliy SESSION, SIPCNT, SESS/SIPCNT visulization
 
 ![image](https://user-images.githubusercontent.com/47383452/141672840-f86d0f38-ac9a-4db7-b752-2ab8238d5ca0.png)
 * Boxplot
 
-* SIP COUNT > 100 인 일자 중, 상위 SEESSION / SIPCOUNT의 수를 보면 다음과 같습니다.
+* SIP COUNT > 100, Top SEESSION / SIPCOUNT
 ![image](https://user-images.githubusercontent.com/47383452/142240852-a9db5f73-7fab-424a-b7e0-b29f58967bfe.png)
 
 ` cat sess_ovr_sipcnt.tsv | awk '$3 > 100{print $0}' | awk '{print $1 "\t" $4}' | feedgnuplot --domain --timefmt '%Y-%m-%d' --lines --points --legend 0 "SESS/SIPCNT"`
  ![image](https://user-images.githubusercontent.com/47383452/142242977-e84a1b2b-18b1-4aba-9747-dd95674d89ec.png)
-* 특정 구간에서 유난히 높은 수치를 보이는 것이 보입니다. 400 이상인 일자를 구분하여 DDoS 여부파악이 필요할 것 같습니다.
+* upper 400 
 * SESS.CIPCNT > 400 인 일자를 ddos_event.tsv로 생성
  ```
  for d in $(cat ddos_event.tsv | awk '{print $1}')
@@ -44,7 +43,6 @@ Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis
  ```
 ![image](https://user-images.githubusercontent.com/47383452/142251515-550f6cdb-9d13-4a1c-97c4-3462a1057988.png)
 
-패킷 레벨로 접근하면 누가 자원을 제일 많이 소모했는가 / 가장 수치가 높은 2017-07-03을 한번 확인해보겠습니다.
 - ` zcat 2017-07-03_ddos_evt.tsv.gz | awk '{print $2}' | sort | uniq -c | awk '{print $2 "\t" $1}' | feedgnuplot --domain --timefmt "%H:%M:%S" --with 'boxes lt -1' --legend 0 "2017-07-03 sps"`
  ![image](https://user-images.githubusercontent.com/47383452/142252794-944c0a6c-fa02-4091-9331-896017b5ea25.png)
 - ` zcat 2017-07-03_ddos_evt.tsv.gz | awk '{print $2 "\t" $3}' | sort -u | awk '{print $1}' | sort | uniq -c | awk '{print $2 "\t" $1}' > 2017-07-03.sipsec.tsv`
@@ -70,7 +68,7 @@ Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis
  ![image](https://user-images.githubusercontent.com/47383452/142257473-7b9c7ae5-e6d9-421b-b345-3bca484add68.png)
   - 2017-07-03 15:00 ~ 19:00 / 20:30 ~ 21:00
  
-* 재방문에 의한 공격 IP 확인
+* Revisiting attack IP
    ```
    cat ts_min_sip | awk '{print $2}' | sort | uniq -c | while read line
    do
@@ -103,11 +101,11 @@ Linux(Ubuntu 20.04) CLI를 활용한 Weblog Analysis
    * IP0040922
    ![image](https://user-images.githubusercontent.com/47383452/142263473-11b65b5c-75b1-4a99-83c0-4fab9f6df664.png)
    
-   #### DDoS 공격 / 특정 시간대에 집중적으로 트래픽이 발생하는 IP를 발견할 수 있었습니다. Revisit 비율이 높고 패킷레벨에서 많은 자원을 소비한 것을 확인하였습니다.
+   #### DDoS IP discovered.
 
 ### 2. Response Code Based Analysis
 
-##### 응답코드 400~ 추출
+##### Response code 400~
 
 ```
 zcat srv1_accesslog.gz | awk '$7~/^[12345]/{print $1 "\t" $7}'|sort | uniq -c | awk '{print $2 "\t" $3 "\t" $1}' | 
@@ -126,7 +124,7 @@ cat 400_rcode.tsv | sort -rnk 3 | head | awk '{print $3}'|head
 2698
 2665
 ```
-* 응답코드 4XX인 레코드 시각화
+* Response code 4XX record visualization
  ```
  cat 400_r_code.tsv | sort -rnk 3 | awk ‘{print $3}’ | feedgnuplot –histogram 0 –ymax 5
  ```
@@ -136,7 +134,7 @@ cat 400_rcode.tsv | sort -rnk 3 | awk '{print $1 "\t" $3}' | feedgnuplot --domai
 ```
 ![image](https://user-images.githubusercontent.com/47383452/142265627-e720ffc2-ca86-4874-acda-871dfa11d92e.png)
 
-* 응답코드 4XX인 SIP
+* Response Code 4XX SIP
 ```
 zcat srv1_accesslog.gz | awk '$7~/^[12345]/{print $3 "\t" $7}'|sort | uniq -c | awk '{print $2 "\t" $3 "\t" $1}' | awk '{if ($2 >=400 && $2 < 500) print $0}' > sip_rcode.tsv
 ```
@@ -156,7 +154,7 @@ IP1087023	404	7962
 IP1056822	404	6520
 ```
 
-* 4XX가 상위 100개인 IP 통신 추출
+* 4XX
 ```
 cat sip_rcode.tsv | sort -rnk 3 | head -100 > top_sip.ip
 ```
@@ -179,7 +177,7 @@ cat IP* | awk '$7!=""{print $1 "\t" $3 "\t" $7}' |sort| awk '{print $1 "_" $2 "_
 ```
 ![image](https://user-images.githubusercontent.com/47383452/142266234-73b5651e-0a3c-4955-adfd-db186669e42c.png)
 
-##### IP0008180과 IP0053005의 400번대 응답코드가 타 IP대비 높은 것을 확인 할 수 있다. 
+##### IP0008180 and IP0053005 400 Response code
 
 * IP0053005
 ```
